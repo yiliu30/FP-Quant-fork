@@ -7,7 +7,7 @@ Repository for the the development of a recipe for efficient and accurate weight
 
 The repository is structured as follows:
 
-* `llama_blockwise_qat.py` - the main script for quantization of the Llama models
+* `model_quant.py` - the main script for quantization of the Llama models
 * `src/` - source code with implementation of all necessary functionality \
     ```├── quantization``` - quantization functionality \
     ```├── transforms``` - transform functionality \
@@ -93,11 +93,12 @@ python model_quant.py \
 ```
 
 Above:
-* `--model_name_or_path` - The model to quantize. (currently only Llama models are supported)
+* `--model_name_or_path` - The model to quantize. (currently only Llama and Qwen models are supported)
 * `--format` - The quantization format.
 * `--w_bits` - The number of bits to quantize the weights to.
 * `--a_bits` - The number of bits to quantize the activations to.
 * `--w_group_size` - The number of weights to quantize together.
+* `--w_observer` - The observer to use for the weights (`mse` or `minmax`).
 * `--a_group_size` - The number of activations to quantize together.
 * `--parametrization` - Transform parameterization.
 * `--gptq` - Whether to use GPTQ quantization.
@@ -108,3 +109,5 @@ Above:
 * `--amp` - Use automatic mixed precision.
 * `--save_path` - Path to save the quantized model.
 * `--real_quant` - Whether to save model in real quantization format.
+* `--eval_perplexity` - Whether to compute perplexity.
+* `--eval_openllm` - Whether to compute OpenLLMv1 scores.
