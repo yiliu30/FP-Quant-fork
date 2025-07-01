@@ -11,7 +11,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
+      contents: read       # allow checkout of the source code
+      id-token:  write     # still needed for OIDC → PyPI upload
     steps:
       - name: Check out code
         uses: actions/checkout@v3
