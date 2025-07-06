@@ -316,7 +316,7 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name_or_path, 
         torch_dtype=args.dtype, 
-        device_map=device, # to avoid errors when model is split on mulitple GPUs
+        device_map=None if args.cpu_offload_modules else device, 
         low_cpu_mem_usage=True,
     )
     model.config.use_cache = False
@@ -338,7 +338,7 @@ def main():
                 args.num_sequences,
                 args.seed
             )
-            quantized_state_dict = gptq_quantization(model, calibration_data, args, device)
+            quantized_state_dict = gptq_quantization(model, calibration_data, args, device=device)
         else:
             quantized_state_dict = rtn_quantization(model, args, device)
 

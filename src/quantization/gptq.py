@@ -229,6 +229,7 @@ def gptq_quantization(
 ) -> Optional[dict[str, torch.Tensor]]:
     print("GPTQ quantization...")
     orig_dtype = model.config.torch_dtype if args.dtype == "auto" else args.dtype
+    activation_offload_device = "cpu" if args.cpu_offload_activations else None
     # State dict with quantized weights, scales and hadamards
     quantized_state_dict = {}
     # Define common transform kwargs
@@ -261,7 +262,11 @@ def gptq_quantization(
 
     blocks = model.model.layers
     blocks[0] = blocks[0].to(device)
-    blocks[0] = InputCollector(blocks[0], cpu_offload=False)
+    blocks[0] = InputCollector(blocks[0], cpu_offload=activation_offload_device)
+
+    if args.cpu_offload_modules:
+        model.get_input_embeddings().to(device)
+        blocks[0].to(device)
 
     for sample in calibration_data:
         try:
@@ -273,6 +278,9 @@ def gptq_quantization(
     input_args = blocks[0].input_args
     input_kwargs = blocks[0].input_kwargs
     blocks[0] = blocks[0].module
+
+    if args.cpu_offload_modules:
+        model.get_input_embeddings().cpu()
 
     # Iterate over transformer blocks
     for block_idx, block in enumerate(blocks):
@@ -381,11 +389,14 @@ def gptq_quantization(
             out = maybe_first_element(out)
             # change only first input argument
             if len(inp_args) > 0:
-                inp_args[0].data = out
+                inp_args[0].data = out.to(activation_offload_device)
             elif "hidden_states" in inp_kwargs:
-                inp_kwargs["hidden_states"] = out
+                inp_kwargs["hidden_states"] = out.to(activation_offload_device)
             else:
                 raise ValueError("Unsupported block input format.")
+
+        if args.cpu_offload_modules:
+            block = block.cpu()
 
         # 10. Clean-up
         del gptq_handles
