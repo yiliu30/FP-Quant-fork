@@ -1,4 +1,4 @@
-# FP Microscaling Quantization Harness
+# FP Format Quantization Harness
 
 This is a harness for efficient and accurate weight-and-activation quantization for low-bit FP/INT formats, with and without microscaling, including FP4, NVFP4, and MXFP. These formats are compatible with the NVIDIA Blackwell GPU architecture. 
 The inference code to run models in the `MXFP` format can be found in [QuTLASS](https://github.com/IST-DASLab/qutlass) repository. 
