@@ -1,14 +1,14 @@
-# FP-quantization-harness
+# FP Microscaling Quantization Harness
 
-Repository for the the development of a recipe for efficient and accurate weight + activation quantization for low-bit FP formats (FP4, NVFP4, MXFP**B**).
-The inference code to run models in `MXFP` format can be found in [QuTLASS](https://github.com/IST-DASLab/qutlass) repository. 
+This is a harness for efficient and accurate weight-and-activation quantization for low-bit FP/INT formats, with and without microscaling, including FP4, NVFP4, and MXFP. These formats are compatible with the NVIDIA Blackwell GPU architecture. 
+The inference code to run models in the `MXFP` format can be found in [QuTLASS](https://github.com/IST-DASLab/qutlass) repository. 
 
 ### Repository structure
 ---
 
 The repository is structured as follows:
 
-* `model_quant.py` - the main script for quantization of the Llama models
+* `model_quant.py` - the main script for quantization of Llama/Qwen models
 * `src/` - source code with implementation of all necessary functionality \
     ```├── quantization``` - quantization functionality \
     ```├── transforms``` - transform functionality \
