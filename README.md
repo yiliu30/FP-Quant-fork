@@ -17,7 +17,7 @@ The repository is structured as follows:
 ### Usage
 ---
 
-Below is an example of the qat script usage:
+Below is an example of the model quantization script usage:
 
 ```shell
 MODEL=${MODEL:-"meta-llama/Llama-3.1-8B-Instruct"}
