@@ -114,3 +114,42 @@ Above:
 * `--eval_openllm` - Whether to compute OpenLLMv1 scores.
 
 `real_quant` option produces models that are runnable on Blackwell architectures (`sm_120`) via transformers and vLLM (currently using the transformers [fork](https://github.com/huggingface/transformers/pull/38696/)).
+
+### Infererence speedup
+
+Below we provide numbers for end-2-end inference vs bf16 with QuTLASS kernels vs `bf16` baseline.
+
+<p float="left">
+  <img src="assets/inference_speedup_qwen3_8b.png" width="400" />
+  <img src="assets/inference_speedup_qwen3_14b.png" width="400" />
+</p>
+
+
+### Evaluation
+
+The results below provide the evaluation results for quantized Llama-3 and Qwen-3 models 
+on the OpenLLM v1 leaderboard. Specifically, we provide average metrics for the following tasks:
+* mmlu_cot_llama (exact_match, strict_match)
+* arc_challenge_llama (exact_match, strict_match)
+* gsm8k_llama (exact_match, strict_match)
+* hellaswag (acc_norm)
+* winogrande (acc)
+* truthfulqa_mc2 (acc)
+
+The results for Qwen3 exclude `arc_challenge_llama` as it turns out to be very noisy. 
+
+Below left column corresponds to weight-only quantization, right column corresponds to weight-and-activation quantization.
+
+**Llama-3.1-8B-Instruct**
+
+<p float="left">
+  <img src="assets/llama-3.1-8b-acc-weight_only.png" width="400" />
+  <img src="assets/llama-3.1-8b-acc-weight_and_activation.png" width="400" />
+</p>
+
+**Qwen-3-8B**
+
+<p float="left">
+  <img src="assets/qwen3-3-8b-acc-weight_only.png" width="400" />
+  <img src="assets/qwen3-3-8b-acc-weight_and_activation.png" width="400" />
+</p>
