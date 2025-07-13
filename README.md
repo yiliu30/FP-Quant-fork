@@ -1,6 +1,7 @@
 # FP-quantization-harness
 
 Repository for the the development of a recipe for efficient and accurate weight + activation quantization for low-bit FP formats (FP4, NVFP4, MXFP**B**).
+The inference code to run models in `MXFP` format can be found in [QuTLASS](https://github.com/IST-DASLab/qutlass) repository. 
 
 ### Repository structure
 ---
@@ -111,3 +112,5 @@ Above:
 * `--real_quant` - Whether to save model in real quantization format.
 * `--eval_perplexity` - Whether to compute perplexity.
 * `--eval_openllm` - Whether to compute OpenLLMv1 scores.
+
+`real_quant` option produces models that are runnable on Blackwell architectures (`sm_120`) via transformers and vLLM (currently using the transformers [fork](https://github.com/huggingface/transformers/pull/38696/)).
