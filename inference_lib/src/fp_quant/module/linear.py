@@ -62,8 +62,8 @@ class FPQuantLinear(nn.Module):
     @torch.no_grad()
     def pre_forward(self):
         # Generate rotation matrices
-        assert self.weight.shape[1] % self.config.hadamard_group_size == 0, "Weight shape must be divisible by hadamard group size"
-        assert self.weight.data.is_cuda, "Weight must be on CUDA"
+        assert self.weight.shape[1] % self.config.hadamard_group_size == 0, f"Weight shape must be divisible by hadamard group size: {self.weight.shape[1]} % {self.config.hadamard_group_size} = {self.weight.shape[1] % self.config.hadamard_group_size}"
+        assert self.weight.data.is_cuda, f"Weight must be on CUDA, but is on {self.weight.device}"
         self.forward_hadamard_matrix = nn.Parameter(
             hadamard_transform(
                 torch.eye(self.config.hadamard_group_size, dtype=self.weight.dtype, device=self.weight.device),

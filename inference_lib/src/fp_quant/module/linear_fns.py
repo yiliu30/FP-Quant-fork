@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
-from qutlass import matmul_mxf4_bf16_tn, fusedQuantizeMx
+from qutlass import matmul_mxf4_bf16_tn, matmul_ada_mxf4_bf16_tn, fusedQuantizeMx
 from qutlass.utils import to_blocked
 
 from ..utils import FPQuantDtype
@@ -27,12 +27,22 @@ def _(x_flat, hadamard_matrix, forward_method):
     return xh_e2m1, xh_e8m0
 
 
-@torch.library.custom_op("fp_quant::matmul_mxf4_bf16_tn", mutates_args=())
+@torch.library.custom_op("fp_quant::matmul_mxf4_bf16_tn_op", mutates_args=())
 def matmul_mxf4_bf16_tn_op(x: torch.Tensor, w: torch.Tensor, xs: torch.Tensor, ws: torch.Tensor, alpha: float) -> torch.Tensor:
     return matmul_mxf4_bf16_tn(x, w, xs, ws.view(torch.float8_e8m0fnu), alpha)
 
 
 @matmul_mxf4_bf16_tn_op.register_fake
+def _(x, w, xs, ws, alpha):
+    return x.new_empty(*x.shape[:-1], w.shape[0], dtype=torch.bfloat16)
+
+
+@torch.library.custom_op("fp_quant::matmul_ada_mxf4_bf16_tn_op", mutates_args=())
+def matmul_ada_mxf4_bf16_tn_op(x: torch.Tensor, w: torch.Tensor, xs: torch.Tensor, ws: torch.Tensor, alpha: float) -> torch.Tensor:
+    return matmul_ada_mxf4_bf16_tn(x, w, xs, ws.view(torch.float8_e8m0fnu), alpha)
+
+
+@matmul_ada_mxf4_bf16_tn_op.register_fake
 def _(x, w, xs, ws, alpha):
     return x.new_empty(*x.shape[:-1], w.shape[0], dtype=torch.bfloat16)
 
@@ -71,6 +81,13 @@ def forward_quantize(x: torch.Tensor, hadamard_matrix: torch.Tensor, dtype: FPQu
             raise ValueError(f"Unsupported forward dtype: {dtype}")
 
 
+def forward_gemm(x_q, w_q, x_scales, w_scales, alpha):
+    if x_q.shape[0] <= 64:
+        return matmul_ada_mxf4_bf16_tn_op(x_q, w_q, x_scales, w_scales, alpha)
+    else:
+        return matmul_mxf4_bf16_tn_op(x_q, w_q, x_scales, w_scales, alpha)
+
+
 class FPQuant4x4MasterFn(Function):
     @staticmethod
     # @torch.compile()
@@ -83,7 +100,7 @@ class FPQuant4x4MasterFn(Function):
         # Quantize weights
         weight_q, weight_scales, weight_mask = forward_quantize(weight, forward_hadamard_matrix, dtype, forward_method)
 
-        y = matmul_mxf4_bf16_tn_op(x_flat_q, weight_q, to_blocked(x_flat_scales), to_blocked(weight_scales), 1. / 9.)
+        y = forward_gemm(x_flat_q, weight_q, x_flat_scales, weight_scales, 1. / 9.)
         
         y = y.unflatten(dim=0, sizes=x.shape[:-1])
         if bias is not None:
@@ -122,7 +139,7 @@ class FPQuant4x4MasterFn(Function):
         )
 
         weight_qtq, weight_qt_scales = quartet.backward_qt_bf16(weight_q, weight_scales, backward_hadamard_matrix, alpha=1.)
-        grad_input = matmul_mxf4_bf16_tn_op(grad_output_q, weight_qtq, to_blocked(grad_output_scales), to_blocked(weight_qt_scales), 1. / 9.)
+        grad_input = matmul_mxf4_bf16_tn_op(grad_output_q, weight_qtq, grad_output_scales, weight_qt_scales, 1. / 9.)
 
         x_flat_mask = _unpack_mask(x_flat_mask)
         grad_input = (
@@ -132,7 +149,7 @@ class FPQuant4x4MasterFn(Function):
 
         grad_output_tq, grad_output_t_scales = quartet.backward_t_bf16(grad_output.flatten(end_dim=-2), backward_hadamard_matrix)
         x_flat_qtq, x_flat_qt_scales = quartet.backward_qt_bf16(x_flat_q, x_flat_scales, backward_hadamard_matrix, alpha=1.)
-        grad_weight_hf = matmul_mxf4_bf16_tn_op(grad_output_tq, x_flat_qtq, to_blocked(grad_output_t_scales), to_blocked(x_flat_qt_scales), 1. / 9.)
+        grad_weight_hf = matmul_mxf4_bf16_tn_op(grad_output_tq, x_flat_qtq, grad_output_t_scales, x_flat_qt_scales, 1. / 9.)
 
         weight_mask = _unpack_mask(weight_mask)
         grad_weight = (
@@ -154,7 +171,7 @@ class FPQuant4x4NoMasterFn(Function):
         # Quantize input
         x_flat_q, x_flat_scales, x_flat_mask = forward_quantize(x_flat, forward_hadamard_matrix, dtype, forward_method)
 
-        y = matmul_mxf4_bf16_tn_op(x_flat_q, weight_q, to_blocked(x_flat_scales), to_blocked(weight_scales), 1. / 9.)
+        y = forward_gemm(x_flat_q, weight_q, x_flat_scales, weight_scales, 1. / 9.)
         
         y = y.unflatten(dim=0, sizes=x.shape[:-1])
         if bias is not None:
@@ -190,7 +207,7 @@ class FPQuant4x4NoMasterFn(Function):
         )
 
         weight_qtq, weight_qt_scales = quartet.backward_qt_bf16(weight_q, weight_scales, backward_hadamard_matrix, alpha=1.)
-        grad_input = matmul_mxf4_bf16_tn_op(grad_output_q, weight_qtq, to_blocked(grad_output_scales), to_blocked(weight_qt_scales), 1. / 9.)
+        grad_input = matmul_mxf4_bf16_tn_op(grad_output_q, weight_qtq, grad_output_scales, weight_qt_scales, 1. / 9.)
 
         x_flat_mask = _unpack_mask(x_flat_mask)
         grad_input = (
@@ -215,7 +232,7 @@ class FPQuant4x16MasterFn(Function):
         # Quantize weights
         weight_q, weight_scales, weight_mask = forward_quantize(weight, forward_hadamard_matrix, dtype, forward_method)
 
-        y = matmul_mxf4_bf16_tn_op(x_flat_q, weight_q, to_blocked(x_flat_scales), to_blocked(weight_scales), 1. / 9.)
+        y = forward_gemm(x_flat_q, weight_q, x_flat_scales, weight_scales, 1. / 9.)
         
         y = y.unflatten(dim=0, sizes=x.shape[:-1])
         if bias is not None:
