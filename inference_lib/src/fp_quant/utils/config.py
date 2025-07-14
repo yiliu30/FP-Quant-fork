@@ -8,7 +8,9 @@ class FPQuantDtype(Enum):
     MXFP4 = "mxfp4"
     BF16 = "bf16"
 
+
 QuantMethod = Literal["quest", "abs_max"]
+
 
 @dataclass
 class FPQuantConfig:

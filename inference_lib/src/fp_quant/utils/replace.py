@@ -3,6 +3,7 @@ from torch import nn
 
 from .config import FPQuantConfig
 
+
 def replace_with_fp_quant_linear(
     model,
     fp_quant_linear_config: FPQuantConfig,
@@ -10,6 +11,7 @@ def replace_with_fp_quant_linear(
     has_been_replaced=False,
 ):
     from ..module import FPQuantLinear
+
     """
     Public method that recursively replaces the Linear layers of the given model with HIGGS quantized layers.
     `accelerate` is needed to use this method. Returns the converted model and a boolean that indicates if the
@@ -37,7 +39,10 @@ def replace_with_fp_quant_linear(
         if isinstance(module, nn.Linear):
             # Check if the current key is not in the `quantization_config.modules_to_not_convert`
             current_key_name_str = ".".join(current_key_name)
-            if not any(current_key_name_str.endswith(key) for key in fp_quant_linear_config.modules_to_not_convert):
+            if not any(
+                current_key_name_str.endswith(key)
+                for key in fp_quant_linear_config.modules_to_not_convert
+            ):
                 with init_empty_weights():
                     in_features = module.in_features
                     out_features = module.out_features
