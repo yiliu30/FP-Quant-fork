@@ -8,7 +8,7 @@ def prepare_quantization_config(group_size: int, format: str) -> dict[str, Any]:
             "forward_method": "abs_max",
             "hadamard_group_size": group_size,
             "modules_to_not_convert": ["lm_head"],
-            "quant_method": "quartet",
+            "quant_method": "fp_quant",
             "store_master_weights": False
         }
     elif format == "nvfp":
