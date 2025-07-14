@@ -117,7 +117,8 @@ Above:
 
 ### Infererence speedup
 
-Below we provide numbers for end-2-end inference vs bf16 with QuTLASS kernels vs `bf16` baseline.
+Below we provide numbers for end-2-end inference with QuTLASS kernels vs `bf16` baseline for Qwen3 models.
+
 
 <p float="left">
   <img src="assets/inference_speedup_qwen3_8b.png" width="400" />
@@ -129,16 +130,16 @@ Below we provide numbers for end-2-end inference vs bf16 with QuTLASS kernels vs
 
 The results below provide the evaluation results for quantized Llama-3 and Qwen-3 models 
 on the OpenLLM v1 leaderboard. Specifically, we provide average metrics for the following tasks:
-* mmlu_cot_llama (exact_match, strict_match)
-* arc_challenge_llama (exact_match, strict_match)
-* gsm8k_llama (exact_match, strict_match)
-* hellaswag (acc_norm)
-* winogrande (acc)
-* truthfulqa_mc2 (acc)
+* `mmlu_cot_llama` (exact_match, strict_match)
+* `arc_challenge_llama` (exact_match, strict_match)
+* `gsm8k_llama` (exact_match, strict_match)
+* `hellaswag` (acc_norm)
+* `winogrande` (acc)
+* `truthfulqa_mc2` (acc)
 
 The results for Qwen3 exclude `arc_challenge_llama` as it turns out to be very noisy. 
 
-Below left column corresponds to weight-only quantization, right column corresponds to weight-and-activation quantization.
+Below left column corresponds to **weight-only** quantization, right column corresponds to **weight-and-activation** quantization. Results for AWQ were produced via the dedicated [AutoAWQ fork](https://github.com/Godofnothing/AutoAWQ-FP).
 
 **Llama-3.1-8B-Instruct**
 
@@ -153,3 +154,5 @@ Below left column corresponds to weight-only quantization, right column correspo
   <img src="assets/qwen3-3-8b-acc-weight_only.png" width="400" />
   <img src="assets/qwen3-3-8b-acc-weight_and_activation.png" width="400" />
 </p>
+
+*Note*. For NVFP format without `hadamard` rotation GPTQ's average performance is below 0.65.  
