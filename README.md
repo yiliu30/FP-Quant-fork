@@ -1,7 +1,11 @@
 # FP Format Quantization Harness
 
 This is a harness for efficient and accurate weight-and-activation quantization for low-bit FP/INT formats, with and without microscaling, including FP4, NVFP4, and MXFP. These formats are compatible with the NVIDIA Blackwell GPU architecture. 
-The inference code to run models in the `MXFP` format can be found in the [QuTLASS](https://github.com/IST-DASLab/qutlass) repository. 
+
+The goal of the repository is to allow you to produce quantized models in these formats. 
+Currently, the repository supports the standard microscaled MXFP4 format, together with standard methods such as RTN and GPTQ quantization for the weights. The main new approach supported--which we found to be particularly effective--is a variant of GPTQ (called GPTQ+Had) where a block-wise Hadamard transform is applied onto the weights and activations before quantization. Key to efficiency is that the Hadamard block size matches the microscaling format group size (16 or 32); in turn, this small Hadamard transform is automatically "fused" into our MatMul kernels. 
+
+The inference code to run models in the `MXFP` format (with speedups) can be found in the [QuTLASS](https://github.com/IST-DASLab/qutlass) repository. 
 
 ### Repository structure
 ---
@@ -13,6 +17,7 @@ The repository is structured as follows:
     ```├── quantization``` - quantization functionality \
     ```├── transforms``` - transform functionality \
     ```├── utils``` - utility functions
+
 
 
 ### Usage
@@ -102,7 +107,7 @@ Above:
 * `--w_observer` - The observer to use for the weights (`mse` or `minmax`).
 * `--a_group_size` - The number of activations to quantize together.
 * `--parametrization` - Transform parameterization.
-* `--gptq` - Whether to use GPTQ quantization.
+* `--gptq` - Whether to use GPTQ quantization for the weights.
 * `--transform_class` - Transform class (`identity` or `hadamard`).
 * `--dataset_name_or_path` - Dataset to use.
 * `--sequence_length` - Sequence length.
@@ -115,18 +120,9 @@ Above:
 
 `real_quant` option produces models that are runnable on Blackwell architectures (`sm_120`) via transformers and vLLM (currently using the transformers [fork](https://github.com/huggingface/transformers/pull/38696/)).
 
-### Infererence speedup
-
-Below we provide numbers for end-2-end inference with QuTLASS kernels vs `bf16` baseline for Qwen3 models.
 
 
-<p float="left">
-  <img src="assets/inference_speedup_qwen3_8b.png" width="400" />
-  <img src="assets/inference_speedup_qwen3_14b.png" width="400" />
-</p>
-
-
-### Evaluation
+### Accuracy Evaluations
 
 The results below provide the evaluation results for quantized Llama-3 and Qwen-3 models 
 on the OpenLLM v1 leaderboard. Specifically, we provide average metrics for the following tasks:
@@ -155,4 +151,20 @@ Below left column corresponds to **weight-only** quantization, right column corr
   <img src="assets/qwen3-3-8b-acc-weight_and_activation.png" width="400" />
 </p>
 
-*Note*. For NVFP format without `hadamard` rotation GPTQ's average performance is below 0.65.  
+*Notes*. For NVFP format without `hadamard` rotation GPTQ's average performance is below 0.65. 
+By and large, `GPTQ+Had` appears to be the best method for preserving accuracy.  
+
+
+### Inference speedups
+
+Below we provide some performance numbers for end-2-end inference with QuTLASS kernels vs `bf16` baseline for Qwen3 models, on an RTX 5090 GPU.
+Please see the [QuTLASS](https://github.com/IST-DASLab/qutlass) repository for details on how to reproduce this. 
+
+<p float="left">
+  <img src="assets/inference_speedup_qwen3_8b.png" width="400" />
+  <img src="assets/inference_speedup_qwen3_14b.png" width="400" />
+</p>
+
+### Contributors 
+
+This project is still in active development. So far, it has benefitted from contributions from Denis Kuznedelev, Andrei Panferov, Vage Egiazarian, Saleh Ashkboos, as well as Dan Alistarh, Michael Goin and Eldar Kurtic. The [QuTLASS](https://github.com/IST-DASLab/qutlass) repository is developed primarily by Roberto Lopez Castro, with help from Jiale Chen. 
