@@ -1,7 +1,10 @@
 import os
+import json
+import math
 import argparse
 
 import torch
+from safetensors.torch import save_file
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import lm_eval
 from lm_eval.utils import make_table
@@ -53,13 +56,48 @@ def save_quantized_model(model, quantized_state_dict, args):
             else:
                 model_state_dict[f"{prefix}{k}"] = v.cpu()
 
-    # Save all remaining blocks
+    # Process all remaining blocks
     tie_word_embeddings = getattr(model.config, "tie_word_embeddings", False)
+
     for k, v in model.state_dict().items():
         if not (k.startswith("model.layers") or (k == "lm_head.weight" and tie_word_embeddings)):
             model_state_dict[k] = v.cpu()
 
-    torch.save(model_state_dict, os.path.join(args.save_path, "pytorch_model.bin"))
+    # Split checkpoint into shards
+    current_shard_idx = 0
+    current_shard_size = 0
+    current_shard = {}
+    shards = []
+
+    for k, v in model_state_dict.items():
+        tensor_size = v.numel()* v.element_size()
+        if current_shard_size + tensor_size > args.max_shard_size:
+            shards.append(current_shard)
+            current_shard = {}
+            current_shard_size = 0
+            current_shard_idx += 1
+        else:
+            current_shard[k] = v
+            current_shard_size += tensor_size
+    # Dump last shard if it is not empty
+    if len(current_shard) > 0:
+        shards.append(current_shard)
+        shards.append(current_shard)
+
+    safetensors_index = {}
+    num_shards = len(shards)
+    max_power_of_10 = math.floor(math.log(num_shards, 10)) + 1
+
+    # Save shards
+    for shard_idx, shard in enumerate(shards):
+        current_shard_path = f"model-{str(shard_idx).zfill(max_power_of_10)}-of-{str(num_shards).zfill(max_power_of_10)}.safetensors"
+        save_file(shard, os.path.join(args.save_path, current_shard_path))
+        for k in shard:
+            safetensors_index[k] = current_shard_path
+
+    # Save safetensors index
+    with open(os.path.join(args.save_path, "model.safetensors.index.json"), "w") as f:
+        json.dump({"metadata": {}, "weight_map": safetensors_index}, f)
 
     # Add quantization metadata
     config.quantization_config = prepare_quantization_config(args.w_group_size, args.format)
@@ -171,7 +209,7 @@ def parse_args():
     parser.add_argument(
         "--mxfp_scale_factor",
         type=float,
-        default=1.0,
+        default=0.75, # Tseng scaling factor
         help="MXFP scale scaling factor for MXFP quantization."
     )
     # GPTQ params
@@ -259,10 +297,10 @@ def parse_args():
         help="Path to save quantized model",
     )
     parser.add_argument(
-        "--blocks_per_shard", 
+        "--max_shard_size", 
         type=int, 
-        default=8, 
-        help="Number of blocks per shard."
+        default=5 * 1024 * 1024 * 1024, 
+        help="Maximum shard size in bytes."
     )
     # Parse arguments
     args = parser.parse_args()
@@ -294,7 +332,6 @@ def parse_args():
         assert wandb is not None, "wandb is not installed. Please install wandb `pip install wandb`."
     # Check real_quant config
     if args.real_quant:
-        assert args.a_bits == 16, "Real quantization is only supported for weight-only quantization."
         assert args.format in "mxfp", "Real quantization is only supported for mxfp format."
     
     return args
@@ -355,6 +392,9 @@ def main():
 
     if args.compile:
         model = torch.compile(model)
+
+    if args.eval_perplexity or args.eval_openllm:
+        model = model.to(device)
 
     if args.eval_perplexity:
         eval_data = get_wikitext2(tokenizer, args.sequence_length)
