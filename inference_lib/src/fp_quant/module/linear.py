@@ -6,6 +6,7 @@ from scipy.linalg import hadamard
 
 from ..utils import FPQuantConfig, FPQuantDtype
 from .linear_fns import (
+    HAS_QUTLASS,
     FPQuant4x16MasterFn,
     FPQuant4x16NoMasterFn,
     forward_quantize,
@@ -34,6 +35,11 @@ class FPQuantLinear(nn.Module):
         dtype: torch.dtype = None,
     ):
         super().__init__()
+
+        if not HAS_QUTLASS and not config.pseudoquantization:
+            raise ValueError(
+                "QuTLASS is not installed. Can only run with `pseudoquantization=True` in the quantization config. If you have a Blackwell GPU, you can install QuTLASS from https://github.com/IST-DASLab/QuTLASS"
+            )
 
         factory_kwargs = {"device": device, "dtype": dtype}
         self.in_features = in_features

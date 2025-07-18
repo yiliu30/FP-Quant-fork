@@ -1,10 +1,16 @@
 from typing import Optional
 
 import torch
-from qutlass import fusedQuantizeMx, matmul_ada_mxf4_bf16_tn, matmul_mxf4_bf16_tn
-from qutlass.utils import to_blocked
 from torch import nn
 from torch.autograd import Function
+
+try:
+    from qutlass import fusedQuantizeMx, matmul_ada_mxf4_bf16_tn, matmul_mxf4_bf16_tn
+    from qutlass.utils import to_blocked
+
+    HAS_QUTLASS = True
+except ImportError:
+    HAS_QUTLASS = False
 
 from ..utils import FPQuantDtype
 
