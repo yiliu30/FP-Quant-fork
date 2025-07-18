@@ -6,11 +6,14 @@ from scipy.linalg import hadamard
 
 from ..utils import FPQuantConfig, FPQuantDtype
 from .linear_fns import (
-    FPQuant4x4MasterFn,
-    FPQuant4x4NoMasterFn,
     FPQuant4x16MasterFn,
     FPQuant4x16NoMasterFn,
     forward_quantize,
+)
+from .pseudoquant_linear_fns import (
+    PseudoQuant4x16MasterFn,
+    PseudoQuant4x16NoMasterFn,
+    forward_pseudoquantize,
 )
 
 
@@ -124,6 +127,17 @@ class FPQuantLinear(nn.Module):
         if self.config.store_master_weights:
             self.qweight = None
             self.scales = None
+        elif self.config.pseudoquantization:
+            self.qweight = None
+            self.scales = None
+            weight_dq, _ = forward_pseudoquantize(
+                self.weight.data,
+                self.forward_hadamard_matrix,
+                self.config.forward_dtype,
+                self.config.forward_method,
+            )
+            self.weight.data = weight_dq
+            self.weight.requires_grad = False
         else:
             weight_q, scales, _ = forward_quantize(
                 self.weight,
@@ -142,29 +156,9 @@ class FPQuantLinear(nn.Module):
             self.config.forward_dtype,
             self.config.backward_dtype,
             self.config.store_master_weights,
+            self.config.pseudoquantization,
         ):
-            case (FPQuantDtype.MXFP4, FPQuantDtype.MXFP4, True):
-                return FPQuant4x4MasterFn.apply(
-                    x,
-                    self.weight,
-                    self.bias,
-                    self.forward_hadamard_matrix,
-                    self.backward_hadamard_matrix,
-                    self.config.forward_dtype,
-                    self.config.forward_method,
-                )
-            case (FPQuantDtype.MXFP4, FPQuantDtype.MXFP4, False):
-                return FPQuant4x4NoMasterFn.apply(
-                    x,
-                    self.qweight,
-                    self.scales,
-                    self.bias,
-                    self.forward_hadamard_matrix,
-                    self.backward_hadamard_matrix,
-                    self.config.forward_dtype,
-                    self.config.forward_method,
-                )
-            case (FPQuantDtype.MXFP4, FPQuantDtype.BF16, True):
+            case (FPQuantDtype.MXFP4, FPQuantDtype.BF16, True, False):
                 return FPQuant4x16MasterFn.apply(
                     x,
                     self.weight,
@@ -173,7 +167,7 @@ class FPQuantLinear(nn.Module):
                     self.config.forward_dtype,
                     self.config.forward_method,
                 )
-            case (FPQuantDtype.MXFP4, FPQuantDtype.BF16, False):
+            case (FPQuantDtype.MXFP4, FPQuantDtype.BF16, False, False):
                 return FPQuant4x16NoMasterFn.apply(
                     x,
                     self.qweight,
@@ -183,7 +177,25 @@ class FPQuantLinear(nn.Module):
                     self.config.forward_dtype,
                     self.config.forward_method,
                 )
+            case (FPQuantDtype.MXFP4, FPQuantDtype.BF16, True, True):
+                return PseudoQuant4x16MasterFn.apply(
+                    x,
+                    self.weight,
+                    self.bias,
+                    self.forward_hadamard_matrix,
+                    self.config.forward_dtype,
+                    self.config.forward_method,
+                )
+            case (FPQuantDtype.MXFP4, FPQuantDtype.BF16, False, True):
+                return PseudoQuant4x16NoMasterFn.apply(
+                    x,
+                    self.weight,
+                    self.bias,
+                    self.forward_hadamard_matrix,
+                    self.config.forward_dtype,
+                    self.config.forward_method,
+                )
             case _:
                 raise ValueError(
-                    f"Forward dtype: {self.config.forward_dtype}, backward dtype: {self.config.backward_dtype}, store_master_weights: {self.config.store_master_weights} isn't supported yet."
+                    f"Forward dtype: {self.config.forward_dtype}, backward dtype: {self.config.backward_dtype}, store_master_weights: {self.config.store_master_weights}, pseudoquantization: {self.config.pseudoquantization} isn't supported yet."
                 )
