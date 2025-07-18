@@ -1,7 +1,8 @@
 import torch
 import torch.nn.functional as F
-from fast_hadamard_transform import hadamard_transform
 from torch import nn
+
+from scipy.linalg import hadamard
 
 from ..utils import FPQuantConfig, FPQuantDtype
 from .linear_fns import (
@@ -11,6 +12,12 @@ from .linear_fns import (
     FPQuant4x16NoMasterFn,
     forward_quantize,
 )
+
+
+def get_hadamard_matrix(group_size: int, dtype: torch.dtype, device: torch.device):
+    return torch.tensor(
+        hadamard(group_size) * group_size**-0.5, dtype=dtype, device=device
+    )
 
 
 class FPQuantLinear(nn.Module):
@@ -99,23 +106,17 @@ class FPQuantLinear(nn.Module):
             f"Weight must be on CUDA, but is on {self.weight.device}"
         )
         self.forward_hadamard_matrix = nn.Parameter(
-            hadamard_transform(
-                torch.eye(
-                    self.config.hadamard_group_size,
-                    dtype=self.weight.dtype,
-                    device=self.weight.device,
-                ),
-                scale=self.config.hadamard_group_size**-0.5,
+            get_hadamard_matrix(
+                self.config.hadamard_group_size,
+                self.weight.dtype,
+                self.weight.device,
             )
         )
         self.backward_hadamard_matrix = nn.Parameter(
-            hadamard_transform(
-                torch.eye(
-                    self.config.hadamard_group_size,
-                    dtype=self.weight.dtype,
-                    device=self.weight.device,
-                ),
-                scale=self.config.hadamard_group_size**-0.5,
+            get_hadamard_matrix(
+                self.config.hadamard_group_size,
+                self.weight.dtype,
+                self.weight.device,
             )
         )
 
