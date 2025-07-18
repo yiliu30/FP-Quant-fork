@@ -47,6 +47,9 @@ class FPQuantLinear(nn.Module):
         self.weight = nn.Parameter(
             torch.empty((out_features, in_features), **factory_kwargs)
         )
+        self.dqweight = nn.Parameter(
+            torch.empty((out_features, in_features), **factory_kwargs)
+        )
         if bias:
             self.bias = nn.Parameter(torch.empty(out_features, **factory_kwargs))
         else:
@@ -133,17 +136,18 @@ class FPQuantLinear(nn.Module):
         if self.config.store_master_weights:
             self.qweight = None
             self.scales = None
+            self.dqweight = None
         elif self.config.pseudoquantization:
-            self.qweight = None
-            self.scales = None
             weight_dq, _ = forward_pseudoquantize(
                 self.weight.data,
                 self.forward_hadamard_matrix,
                 self.config.forward_dtype,
                 self.config.forward_method,
             )
-            self.weight.data = weight_dq
-            self.weight.requires_grad = False
+            self.dqweight = nn.Parameter(weight_dq, requires_grad=False)
+            self.weight = None
+            self.qweight = None
+            self.scales = None
         else:
             weight_q, scales, _ = forward_quantize(
                 self.weight,
@@ -156,6 +160,7 @@ class FPQuantLinear(nn.Module):
                 scales.view(dtype=torch.uint8), requires_grad=False
             )
             self.weight = None
+            self.dqweight = None
 
     def forward(self, x) -> torch.Tensor:
         match (
@@ -186,7 +191,7 @@ class FPQuantLinear(nn.Module):
             case (FPQuantDtype.MXFP4, FPQuantDtype.BF16, True, True):
                 return PseudoQuant4x16MasterFn.apply(
                     x,
-                    self.weight,
+                    self.dqweight,
                     self.bias,
                     self.forward_hadamard_matrix,
                     self.config.forward_dtype,
@@ -195,7 +200,7 @@ class FPQuantLinear(nn.Module):
             case (FPQuantDtype.MXFP4, FPQuantDtype.BF16, False, True):
                 return PseudoQuant4x16NoMasterFn.apply(
                     x,
-                    self.weight,
+                    self.dqweight,
                     self.bias,
                     self.forward_hadamard_matrix,
                     self.config.forward_dtype,
