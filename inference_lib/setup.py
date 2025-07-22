@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="fp_quant",
-    version="0.1.5",
+    version="0.1.6",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     author="Andrei Panferov",
@@ -20,7 +20,6 @@ setup(
     install_requires=[
         "torch>=2.7.0",
         "scipy>=1.13.0",
-        "qutlass>=0.0.1",
         "triton>=3.3.0",
     ],
 )

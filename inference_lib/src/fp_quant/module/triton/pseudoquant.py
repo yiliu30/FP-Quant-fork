@@ -215,18 +215,19 @@ def mxfp4_forward_kernel_wrapper(
     grid = lambda meta: (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
 
     # Launch optimized kernel
-    mxfp4_forward_kernel[grid](
-        x_ptr=x,
-        hadamard_matrix_ptr=hadamard_matrix,
-        output_ptr=output,
-        clip_mask_ptr=clip_mask,
-        n_elements=n_elements,
-        hadamard_dim=hadamard_matrix.shape[-1],
-        group_size=32,
-        gaussian_scale=gaussian_scale,
-        stochastic_round=stochastic_round,
-        seed=seed,
-        quest=quest,
-    )
+    with torch.cuda.device(x.device):
+        mxfp4_forward_kernel[grid](
+            x_ptr=x,
+            hadamard_matrix_ptr=hadamard_matrix,
+            output_ptr=output,
+            clip_mask_ptr=clip_mask,
+            n_elements=n_elements,
+            hadamard_dim=hadamard_matrix.shape[-1],
+            group_size=32,
+            gaussian_scale=gaussian_scale,
+            stochastic_round=stochastic_round,
+            seed=seed,
+            quest=quest,
+        )
 
     return output, clip_mask
