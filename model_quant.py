@@ -58,39 +58,41 @@ def save_quantized_model(model, quantized_state_dict, args):
 
     # Process all remaining blocks
     tie_word_embeddings = getattr(model.config, "tie_word_embeddings", False)
-
+    
     for k, v in model.state_dict().items():
         if not (k.startswith("model.layers") or (k == "lm_head.weight" and tie_word_embeddings)):
             model_state_dict[k] = v.cpu()
 
     # Split checkpoint into shards
-    current_shard_idx = 0
     current_shard_size = 0
     current_shard = {}
     shards = []
 
     for k, v in model_state_dict.items():
-        tensor_size = v.numel()* v.element_size()
+        tensor_size = v.numel() * v.element_size()
         if current_shard_size + tensor_size > args.max_shard_size:
             shards.append(current_shard)
             current_shard = {}
             current_shard_size = 0
-            current_shard_idx += 1
-        else:
-            current_shard[k] = v
-            current_shard_size += tensor_size
+
+        if tensor_size > args.max_shard_size:
+            shards.append({k: v})
+            continue
+        
+        current_shard[k] = v
+        current_shard_size += tensor_size
+
     # Dump last shard if it is not empty
     if len(current_shard) > 0:
-        shards.append(current_shard)
         shards.append(current_shard)
 
     safetensors_index = {}
     num_shards = len(shards)
-    max_power_of_10 = math.floor(math.log(num_shards, 10)) + 1
+    max_digits = len(str(max(num_shards, 1)))
 
     # Save shards
     for shard_idx, shard in enumerate(shards):
-        current_shard_path = f"model-{str(shard_idx).zfill(max_power_of_10)}-of-{str(num_shards).zfill(max_power_of_10)}.safetensors"
+        current_shard_path = f"model-{str(shard_idx+1).zfill(max_digits)}-of-{str(num_shards).zfill(max_digits)}.safetensors"
         save_file(shard, os.path.join(args.save_path, current_shard_path))
         for k in shard:
             safetensors_index[k] = current_shard_path
