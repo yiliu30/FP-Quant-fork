@@ -266,7 +266,6 @@ def gptq_quantization(
 
     if args.cpu_offload_modules:
         model.get_input_embeddings().to(device)
-        blocks[0].to(device)
 
     for sample in calibration_data:
         try:

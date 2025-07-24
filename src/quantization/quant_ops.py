@@ -29,10 +29,15 @@ def get_quantization_range(format: QuantizationFormat, bits: int, symmetric: boo
             q_min, q_max = 0, bit_range - 1
         return q_min, q_max
 def pack_fp4_to_uint8(x: torch.Tensor) -> torch.Tensor:
-    fp4_indices = torch.bucketize(x, torch.tensor(FP4_GRID, device=x.device))
-    fp4_indices = torch.clamp(fp4_indices, 0, 2 ** 4 - 1)
-    fp4_indices = torch.tensor(FP4_BITPACKING_PERM, device=x.device)[fp4_indices]
-    return (fp4_indices[:, 1::2] << 4 | fp4_indices[:, ::2]).to(torch.uint8)
+    grid = torch.tensor(FP4_GRID, device=x.device)
+    perm = torch.tensor(FP4_BITPACKING_PERM, device=x.device)
+
+    grid_ids = torch.bucketize(x, grid)
+    lo, hi = (grid_ids - 1).clamp(min=0, max=2 ** 4 - 1), grid_ids.clamp(min=0, max=2 ** 4 - 1)
+    g_lo, g_hi = grid[lo], grid[hi]
+    pick_hi = (g_hi - x) <= (x - g_lo)
+    q = torch.where(pick_hi, perm[hi], perm[lo])
+    return (q[:, 1::2] << 4 | q[:, ::2]).to(torch.uint8)
 ### Integer Quantization ###
 def quantize_int(x: torch.Tensor, scales: torch.Tensor, zeros: torch.Tensor, q_min: int, q_max: int) -> torch.Tensor:
     return (x / scales + zeros).round().clamp(q_min, q_max)
